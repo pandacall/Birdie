@@ -9,9 +9,25 @@ end-to-end without touching any external service.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from birdie.models import Category, CompilationPlan, MatchData, OutputProfile
+
+
+class LiveClient(Protocol):
+    """Reads the Riot Live Client Data API (localhost:2999) for the live game."""
+
+    def active_player(self) -> str | None:
+        """The active player's riot id, or None when no game is running."""
+        ...
+
+    def game_time(self) -> float:
+        """Current in-game clock in seconds."""
+        ...
+
+    def event_dicts(self) -> list[dict[str, Any]]:
+        """The raw (cumulative) event list from the API."""
+        ...
 
 
 class Recorder(Protocol):

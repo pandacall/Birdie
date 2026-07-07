@@ -3,8 +3,41 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 from birdie.models import Category, CompilationPlan, MatchData, OutputProfile
+
+
+class FakeLiveClient:
+    """Scripted Live Client: ``active_seq`` is consumed one value per
+    ``active_player()`` call; ``event_polls`` one batch per ``event_dicts()``."""
+
+    def __init__(
+        self,
+        active_seq: list[str | None],
+        event_polls: list[list[dict[str, Any]]] | None = None,
+        game_time: float = 100.0,
+    ) -> None:
+        self._active = list(active_seq)
+        self._polls = list(event_polls or [])
+        self._game_time = game_time
+        self._i_active = 0
+        self._i_polls = 0
+
+    def active_player(self) -> str | None:
+        value = self._active[self._i_active]
+        self._i_active += 1
+        return value
+
+    def game_time(self) -> float:
+        return self._game_time
+
+    def event_dicts(self) -> list[dict[str, Any]]:
+        if self._i_polls < len(self._polls):
+            batch = self._polls[self._i_polls]
+            self._i_polls += 1
+            return batch
+        return []
 
 
 class FakeRecorder:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 
 class Category(str, Enum):
@@ -39,10 +40,39 @@ class OutputProfile:
 
 @dataclass(frozen=True)
 class Event:
-    """A single raw occurrence read from the Riot Live Client Data API."""
+    """A single raw occurrence read from the Riot Live Client Data API.
 
+    Participant fields are normalised at the adapter boundary: the various Riot
+    source fields (KillerName / Recipient / Acer) all map onto ``actor``, and
+    ``victim`` holds VictimName where present.
+    """
+
+    id: int
     name: str
     game_time: float
+    actor: str | None = None
+    victim: str | None = None
+    assisters: tuple[str, ...] = ()
+    kill_streak: int | None = None
+
+
+@dataclass(frozen=True)
+class TimelineAnchor:
+    """The single (recording position, game clock) pair captured at recording
+    start. Bridges Riot game-time and the OBS recording clock."""
+
+    recording_position: float
+    game_clock: float
+
+
+@dataclass(frozen=True)
+class CompletedGame:
+    """Everything the post-game pipeline needs, handed over when a game ends."""
+
+    recording: Path
+    events: tuple[Event, ...]
+    anchor: TimelineAnchor
+    player: str
 
 
 @dataclass(frozen=True)
