@@ -1,0 +1,18 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+build/
+dist/
+
+# Runtime artifacts
+recordings/
+compilations/
+*.mkv
+*.mp4
+
+# Local secrets / config with tokens
+secrets.toml
+.env
