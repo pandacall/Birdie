@@ -28,7 +28,9 @@ from birdie.models import CompletedGame, MatchData
 from birdie.pipeline import SkeletonPipeline
 from birdie.postgame import process_game
 from birdie.queue import ReviewQueue
+from birdie.review import ReviewService
 from birdie.watcher import GameWatcher
+from birdie.webreview import serve
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -45,6 +47,10 @@ def _build_parser() -> argparse.ArgumentParser:
     sk.add_argument("--duration", type=float, default=0.0)
 
     sub.add_parser("watch", help="auto-detect games and record them")
+
+    rv = sub.add_parser("review", help="serve the local review queue web page")
+    rv.add_argument("--host", default="127.0.0.1")
+    rv.add_argument("--port", type=int, default=8765)
     return p
 
 
@@ -118,7 +124,16 @@ def main(argv: list[str] | None = None) -> int:
         return _run_skeleton(config, args, meta_token)
     if args.command == "watch":
         return _run_watch(config, meta_token)
+    if args.command == "review":
+        return _run_review(config, meta_token, args.host, args.port)
     return 2
+
+
+def _run_review(config: Config, meta_token: str, host: str, port: int) -> int:
+    publisher = MetaPublisher(config.page_id, meta_token, config.meta_api_version)
+    service = ReviewService(ReviewQueue(config.compilations_dir / "queue"), publisher)
+    serve(service, host, port)
+    return 0
 
 
 if __name__ == "__main__":
