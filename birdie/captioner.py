@@ -1,34 +1,43 @@
 """Caption generation.
 
 The template Captioner states facts drawn from MatchData and never invents
-them; tone shifts with the Compilation's dominant Category, and hashtags are
-derived from match data plus compilation Signals. The LLM flavour layer
-(iteration 2) will implement the same Captioner port.
+them; Tone shifts with the Compilation's dominant Category (falling back to the
+configured default), and hashtags are derived from match data plus compilation
+Signals. The LLM flavour layer (iteration 2) will implement the same port.
 """
 
 from __future__ import annotations
 
-from birdie.models import Category, CompilationPlan, MatchData
+from birdie.models import Category, CompilationPlan, MatchData, Tone
 from birdie.signals import Signals, compilation_signals
 
 _MAX_HASHTAGS = 8
 _STREAK_TAG = {5: "#Pentakill", 4: "#Quadrakill", 3: "#Triplekill"}
+_TONE_BY_CATEGORY = {
+    Category.EPIC: Tone.HYPE,
+    Category.BLOOPER: Tone.SELF_DEPRECATING,
+}
 
 
 class TemplateCaptioner:
     """Deterministic, fact-only Captioner (implements the Captioner port)."""
 
+    def __init__(self, default_tone: Tone = Tone.DEADPAN) -> None:
+        self._default_tone = default_tone
+
     def caption(self, match: MatchData, plan: CompilationPlan) -> str:
         kda = f"{match.kills}/{match.deaths}/{match.assists}"
         facts = f"{match.champion} • {kda} • {match.result}"
-        body = self._apply_tone(facts, plan.dominant_category)
+        tone = _TONE_BY_CATEGORY.get(plan.dominant_category, self._default_tone)
         tags = self._hashtags(match, compilation_signals(plan))
-        return f"{body}\n\n{' '.join(tags)}"
+        return f"{self._render(tone, facts)}\n\n{' '.join(tags)}"
 
-    def _apply_tone(self, facts: str, category: Category) -> str:
-        if category == Category.EPIC:
+    def _render(self, tone: Tone, facts: str) -> str:
+        if tone == Tone.HYPE:
             return f"🔥 {facts} 🔥"
-        return f"not my proudest game... {facts} 😅"
+        if tone == Tone.SELF_DEPRECATING:
+            return f"not my proudest game... {facts} 😅"
+        return facts  # deadpan
 
     def _hashtags(self, match: MatchData, signals: Signals) -> list[str]:
         tags = ["#LeagueOfLegends", "#LoL", "#" + match.champion.replace(" ", "")]

@@ -29,3 +29,27 @@ api_version = "v21.0"
 [tuning]
 merge_gap = 6.0
 length_budget = 75.0
+window_pre = 8.0
+window_post = 4.0
+
+# Posting mode: default is review; rules carve out auto for trusted cases.
+default_posting_mode = "review"
+default_tone = "deadpan"   # hype | deadpan | self-deprecating (auto-shifts by category)
+
+# [scores] overrides the built-in per-event base scores, e.g.:
+# [scores]
+# penta = 25.0
+
+# Gate rules — evaluated top-to-bottom, first match wins.
+[[rules]]
+kind = "contains_multikill"
+min_streak = 5
+mode = "auto"          # pentakills auto-post
+
+[[rules]]
+kind = "peak_category"
+category = "blooper"
+mode = "review"        # blooper-headlined games always get a look first
+
+# For token auto-refresh, also set env vars BIRDIE_META_APP_ID and
+# BIRDIE_META_APP_SECRET (the token itself stays in BIRDIE_META_TOKEN).

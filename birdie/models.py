@@ -25,6 +25,14 @@ class PostingMode(str, Enum):
     REVIEW = "review"
 
 
+class Tone(str, Enum):
+    """The voice of a Caption."""
+
+    HYPE = "hype"
+    DEADPAN = "deadpan"
+    SELF_DEPRECATING = "self-deprecating"
+
+
 @dataclass(frozen=True)
 class OutputProfile:
     """Target shape of the published video: aspect ratio + length rules.

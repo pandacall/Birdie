@@ -27,8 +27,15 @@ class ReviewService:
     def discard(self, item_id: str) -> None:
         self._queue.discard(item_id)
 
-    def approve(self, item_id: str) -> str:
+    def approve(self, item_id: str) -> str | None:
+        """Publish the queued compilation with its current caption. On a publish
+        failure (e.g. expired token) the item is parked with the reason and None
+        is returned, rather than crashing the web request."""
         item = self._queue.get(item_id)
-        post_id = self._publisher.publish(item.video, item.caption)
+        try:
+            post_id = self._publisher.publish(item.video, item.caption)
+        except Exception as exc:
+            self._queue.park(item_id, reason=f"publish failed: {exc}")
+            return None
         self._queue.approve(item_id)
         return post_id

@@ -15,6 +15,7 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 
 from birdie.adapters.ffmpeg_editor import FfmpegEditor
@@ -30,8 +31,36 @@ from birdie.pipeline import SkeletonPipeline
 from birdie.postgame import recover_orphans, run_post_game
 from birdie.queue import ReviewQueue
 from birdie.review import ReviewService
+from birdie.token import TokenStore, maybe_refresh, refresh_long_lived_token
 from birdie.watcher import GameWatcher
 from birdie.webreview import serve
+
+_REFRESH_THRESHOLD = 7 * 24 * 3600  # refresh a token within a week of expiry
+_LONG_LIVED = 60 * 24 * 3600
+
+
+def _resolve_token(config: Config, meta_token: str) -> str:
+    """Proactively refresh the Meta token when app credentials are configured;
+    otherwise use the env token as-is."""
+    app_id = os.environ.get("BIRDIE_META_APP_ID")
+    app_secret = os.environ.get("BIRDIE_META_APP_SECRET")
+    if not (app_id and app_secret):
+        return meta_token
+    store = TokenStore(config.compilations_dir / "token.json")
+    if store.load() is None:
+        store.save(meta_token, time.time() + _LONG_LIVED)
+    try:
+        return maybe_refresh(
+            store,
+            now=time.time(),
+            threshold_seconds=_REFRESH_THRESHOLD,
+            exchange=lambda t: refresh_long_lived_token(
+                app_id, app_secret, t, config.meta_api_version
+            ),
+        )
+    except Exception as exc:  # never let a refresh hiccup stop the agent
+        print(f"warning: token refresh failed ({exc}); using existing token", file=sys.stderr)
+        return meta_token
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -60,8 +89,10 @@ def _run_skeleton(config: Config, args: argparse.Namespace, meta_token: str) -> 
     pipeline = SkeletonPipeline(
         recorder=ObsRecorder(config.obs_host, config.obs_port, obs_password),
         editor=FfmpegEditor(),
-        captioner=TemplateCaptioner(),
-        publisher=MetaPublisher(config.page_id, meta_token, config.meta_api_version),
+        captioner=TemplateCaptioner(config.default_tone),
+        publisher=MetaPublisher(
+            config.page_id, _resolve_token(config, meta_token), config.meta_api_version
+        ),
         config=config,
     )
     match = MatchData(
@@ -86,8 +117,10 @@ def _run_skeleton(config: Config, args: argparse.Namespace, meta_token: str) -> 
 def _run_watch(config: Config, meta_token: str) -> int:
     obs_password = os.environ.get("BIRDIE_OBS_PASSWORD", "")
     editor = FfmpegEditor()
-    captioner = TemplateCaptioner()
-    publisher = MetaPublisher(config.page_id, meta_token, config.meta_api_version)
+    captioner = TemplateCaptioner(config.default_tone)
+    publisher = MetaPublisher(
+        config.page_id, _resolve_token(config, meta_token), config.meta_api_version
+    )
     queue = ReviewQueue(config.compilations_dir / "queue")
     ledger = ProcessedLedger(config.compilations_dir / "processed.json")
 
@@ -116,7 +149,10 @@ def _run_watch(config: Config, meta_token: str) -> int:
     )
     print("Watching for a League game... (Ctrl-C to stop)")
     while True:
-        watcher.watch_once()
+        try:
+            watcher.watch_once()
+        except Exception as exc:  # a bad game (e.g. OBS drop) must not kill the agent
+            print(f"watch cycle failed ({exc}); continuing", file=sys.stderr)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -137,7 +173,9 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _run_review(config: Config, meta_token: str, host: str, port: int) -> int:
-    publisher = MetaPublisher(config.page_id, meta_token, config.meta_api_version)
+    publisher = MetaPublisher(
+        config.page_id, _resolve_token(config, meta_token), config.meta_api_version
+    )
     service = ReviewService(ReviewQueue(config.compilations_dir / "queue"), publisher)
     serve(service, host, port)
     return 0

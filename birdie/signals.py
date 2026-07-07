@@ -26,8 +26,15 @@ def compilation_signals(plan: CompilationPlan) -> Signals:
         for moment in clip.moments:
             if moment.event.name == "Multikill" and moment.event.kill_streak:
                 max_multikill = max(max_multikill, moment.event.kill_streak)
+    # The peak-Clip category, computed here so the Gate signal doesn't depend on
+    # how the planner derives dominant_category (which drives caption tone).
+    peak_category = (
+        max(plan.clips, key=lambda c: c.score).category
+        if plan.clips
+        else plan.dominant_category
+    )
     return Signals(
         max_multikill=max_multikill,
-        peak_category=plan.dominant_category,
+        peak_category=peak_category,
         aggregate_score=aggregate,
     )
