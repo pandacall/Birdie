@@ -100,14 +100,39 @@ class MatchData:
 
 
 @dataclass(frozen=True)
-class CompilationPlan:
-    """The pure output of the planner: which Windows to cut, in order, plus the
-    gating decision and the dominant Category (which drives caption tone).
+class Moment:
+    """One scored Event — the atomic unit of 'something worth noticing'."""
 
-    The Caption *text* is produced separately by a Captioner seam operating on
-    this plan, so the template/LLM captioner stays swappable.
+    event: Event
+    score: float
+    category: Category
+
+
+@dataclass(frozen=True)
+class Clip:
+    """The rendered video of a single play: a merged Window plus the Moments it
+    covers, an aggregate score, and a Category (its peak Moment's kind)."""
+
+    window: Window
+    score: float
+    category: Category
+    moments: tuple[Moment, ...]
+
+
+@dataclass(frozen=True)
+class CompilationPlan:
+    """The pure output of the planner: the chosen Clips (in chronological order)
+    plus the gating decision and the dominant Category (which drives caption
+    tone).
+
+    The Caption *text* is produced separately by a Captioner seam, so the
+    template/LLM captioner stays swappable.
     """
 
-    windows: tuple[Window, ...]
+    clips: tuple[Clip, ...]
     posting_mode: PostingMode
     dominant_category: Category
+
+    @property
+    def windows(self) -> tuple[Window, ...]:
+        return tuple(clip.window for clip in self.clips)

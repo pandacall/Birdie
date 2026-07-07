@@ -26,6 +26,7 @@ from birdie.config import Config, load_config
 from birdie.eventlog import write_event_log
 from birdie.models import CompletedGame, MatchData
 from birdie.pipeline import SkeletonPipeline
+from birdie.postgame import process_game
 from birdie.watcher import GameWatcher
 
 
@@ -77,12 +78,16 @@ def _run_skeleton(config: Config, args: argparse.Namespace, meta_token: str) -> 
 def _run_watch(config: Config) -> int:
     obs_password = os.environ.get("BIRDIE_OBS_PASSWORD", "")
 
+    editor = FfmpegEditor()
+
     def on_game_end(game: CompletedGame) -> None:
         log_path = config.recordings_dir / f"{game.recording.stem}.events.json"
         write_event_log(log_path, game)
+        compilation = process_game(game, config, editor)
+        where = compilation if compilation is not None else "(no clip-worthy moments)"
         print(
-            f"Game ended: {len(game.events)} events logged for {game.player}\n"
-            f"  recording: {game.recording}\n  event log: {log_path}"
+            f"Game ended: {len(game.events)} events for {game.player}\n"
+            f"  event log:   {log_path}\n  compilation: {where}"
         )
 
     watcher = GameWatcher(

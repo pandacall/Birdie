@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from birdie.config import Config
+from birdie.config import _DEFAULT_SCORES, Config
 from birdie.models import MatchData, OutputProfile, Window
 
 
@@ -13,6 +13,9 @@ def make_config(**overrides: object) -> Config:
         compilations_dir=Path("compilations"),
         merge_gap=6.0,
         length_budget=75.0,
+        scores=dict(_DEFAULT_SCORES),
+        window_pre=8.0,
+        window_post=4.0,
     )
     base.update(overrides)
     return Config(**base)  # type: ignore[arg-type]

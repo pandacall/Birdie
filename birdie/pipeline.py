@@ -16,9 +16,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from birdie.config import Config
-from birdie.planner import plan_compilation
 from birdie.ports import Captioner, Publisher, Recorder, VideoEditor
-from birdie.models import MatchData
+from birdie.models import Category, Clip, CompilationPlan, MatchData, PostingMode
 
 
 @dataclass(frozen=True)
@@ -52,7 +51,20 @@ class SkeletonPipeline:
         wait_for_stop()
         recording = self._recorder.stop()
 
-        plan = plan_compilation(event_log=[], match=match, config=self._config)
+        # M0 has no scoring: one hardcoded Window becomes the whole plan. The
+        # real event-driven planner (issue #4) serves the auto/watch path.
+        plan = CompilationPlan(
+            clips=(
+                Clip(
+                    window=self._config.skeleton_window,
+                    score=0.0,
+                    category=Category.EPIC,
+                    moments=(),
+                ),
+            ),
+            posting_mode=PostingMode.REVIEW,
+            dominant_category=Category.EPIC,
+        )
         caption = self._captioner.caption(match, plan.dominant_category)
 
         out = self._config.compilations_dir / f"{match.champion}-compilation.mp4"

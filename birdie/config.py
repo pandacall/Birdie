@@ -15,6 +15,25 @@ from birdie.models import OutputProfile, Window
 
 _DEFAULT_PROFILE = OutputProfile(name="video", width=1920, height=1080, max_seconds=None)
 
+# Per-event base scores (CONTEXT.md: tuning knobs, not architecture). A death
+# scores positively — it is blooper *content*, not a penalty.
+_DEFAULT_SCORES: dict[str, float] = {
+    "kill": 1.0,
+    "assist": 0.5,
+    "death": 1.0,
+    "double": 3.0,
+    "triple": 6.0,
+    "quadra": 10.0,
+    "penta": 20.0,
+    "FirstBlood": 3.0,
+    "Ace": 5.0,
+    "DragonKill": 2.0,
+    "BaronKill": 4.0,
+    "HeraldKill": 2.0,
+    "TurretKilled": 1.0,
+    "InhibKilled": 2.0,
+}
+
 
 @dataclass(frozen=True)
 class Config:
@@ -25,6 +44,9 @@ class Config:
     compilations_dir: Path
     merge_gap: float
     length_budget: float
+    scores: dict[str, float]
+    window_pre: float = 8.0
+    window_post: float = 4.0
     obs_host: str = "localhost"
     obs_port: int = 4455
     meta_api_version: str = "v21.0"
@@ -53,6 +75,9 @@ def load_config(path: Path) -> Config:
     obs_raw = raw.get("obs", {})
     meta_raw = raw.get("meta", {})
 
+    scores = dict(_DEFAULT_SCORES)
+    scores.update({k: float(v) for k, v in raw.get("scores", {}).items()})
+
     return Config(
         page_id=str(raw.get("page_id", "")),
         output_profile=profile,
@@ -61,6 +86,9 @@ def load_config(path: Path) -> Config:
         compilations_dir=Path(paths_raw.get("compilations", "compilations")),
         merge_gap=float(tuning_raw.get("merge_gap", 6.0)),
         length_budget=float(tuning_raw.get("length_budget", 75.0)),
+        scores=scores,
+        window_pre=float(tuning_raw.get("window_pre", 8.0)),
+        window_post=float(tuning_raw.get("window_post", 4.0)),
         obs_host=str(obs_raw.get("host", "localhost")),
         obs_port=int(obs_raw.get("port", 4455)),
         meta_api_version=str(meta_raw.get("api_version", "v21.0")),
