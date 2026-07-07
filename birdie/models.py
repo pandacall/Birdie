@@ -67,12 +67,18 @@ class TimelineAnchor:
 
 @dataclass(frozen=True)
 class CompletedGame:
-    """Everything the post-game pipeline needs, handed over when a game ends."""
+    """Everything the post-game pipeline needs, handed over when a game ends.
+
+    ``champion`` and ``result`` are captured live (they aren't in the event log);
+    they default to "Unknown" when unavailable.
+    """
 
     recording: Path
     events: tuple[Event, ...]
     anchor: TimelineAnchor
     player: str
+    champion: str = "Unknown"
+    result: str = "Unknown"
 
 
 @dataclass(frozen=True)

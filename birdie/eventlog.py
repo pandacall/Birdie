@@ -43,6 +43,8 @@ def write_event_log(path: Path, game: CompletedGame) -> None:
     payload = {
         "recording": str(game.recording),
         "player": game.player,
+        "champion": game.champion,
+        "result": game.result,
         "anchor": {
             "recording_position": game.anchor.recording_position,
             "game_clock": game.anchor.game_clock,
@@ -62,4 +64,6 @@ def read_event_log(path: Path) -> CompletedGame:
             game_clock=payload["anchor"]["game_clock"],
         ),
         player=payload["player"],
+        champion=payload.get("champion", "Unknown"),
+        result=payload.get("result", "Unknown"),
     )

@@ -11,7 +11,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Protocol
 
-from birdie.models import Category, CompilationPlan, MatchData, OutputProfile
+from birdie.models import CompilationPlan, MatchData, OutputProfile
 
 
 class LiveClient(Protocol):
@@ -19,6 +19,10 @@ class LiveClient(Protocol):
 
     def active_player(self) -> str | None:
         """The active player's riot id, or None when no game is running."""
+        ...
+
+    def active_champion(self) -> str:
+        """The active player's champion name."""
         ...
 
     def game_time(self) -> float:
@@ -60,7 +64,7 @@ class Captioner(Protocol):
     """Produces the Caption text for a Compilation. Swappable: template now,
     LLM in iteration 2."""
 
-    def caption(self, match: MatchData, dominant_category: Category) -> str:
+    def caption(self, match: MatchData, plan: CompilationPlan) -> str:
         ...
 
 

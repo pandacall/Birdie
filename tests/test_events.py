@@ -1,4 +1,4 @@
-from birdie.events import new_player_events, parse_event
+from birdie.events import game_result, new_player_events, parse_event
 from birdie.models import Event
 
 
@@ -70,6 +70,15 @@ def test_new_player_events_keeps_only_events_involving_the_player() -> None:
     events = new_player_events(batch, player, seen_ids=set())
 
     assert [e.id for e in events] == [1, 3, 4]
+
+
+def test_game_result_reads_win_loss_from_gameend() -> None:
+    win = [{"EventID": 9, "EventName": "GameEnd", "EventTime": 1500.0, "Result": "Win"}]
+    lose = [{"EventID": 9, "EventName": "GameEnd", "EventTime": 1500.0, "Result": "Lose"}]
+
+    assert game_result(win) == "Victory"
+    assert game_result(lose) == "Defeat"
+    assert game_result([{"EventID": 1, "EventName": "ChampionKill"}]) is None
 
 
 def test_new_player_events_skips_already_seen_ids() -> None:

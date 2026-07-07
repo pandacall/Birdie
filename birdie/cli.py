@@ -27,6 +27,7 @@ from birdie.eventlog import write_event_log
 from birdie.models import CompletedGame, MatchData
 from birdie.pipeline import SkeletonPipeline
 from birdie.postgame import process_game
+from birdie.queue import ReviewQueue
 from birdie.watcher import GameWatcher
 
 
@@ -75,20 +76,25 @@ def _run_skeleton(config: Config, args: argparse.Namespace, meta_token: str) -> 
     return 0
 
 
-def _run_watch(config: Config) -> int:
+def _run_watch(config: Config, meta_token: str) -> int:
     obs_password = os.environ.get("BIRDIE_OBS_PASSWORD", "")
-
     editor = FfmpegEditor()
+    captioner = TemplateCaptioner()
+    publisher = MetaPublisher(config.page_id, meta_token, config.meta_api_version)
+    queue = ReviewQueue(config.compilations_dir / "queue")
 
     def on_game_end(game: CompletedGame) -> None:
-        log_path = config.recordings_dir / f"{game.recording.stem}.events.json"
-        write_event_log(log_path, game)
-        compilation = process_game(game, config, editor)
-        where = compilation if compilation is not None else "(no clip-worthy moments)"
-        print(
-            f"Game ended: {len(game.events)} events for {game.player}\n"
-            f"  event log:   {log_path}\n  compilation: {where}"
+        write_event_log(
+            config.recordings_dir / f"{game.recording.stem}.events.json", game
         )
+        result = process_game(game, config, editor, captioner, publisher, queue)
+        if result.video is None:
+            outcome = "no clip-worthy moments"
+        elif result.published_id is not None:
+            outcome = f"auto-published {result.published_id}"
+        else:
+            outcome = f"queued for review ({result.queued_id})"
+        print(f"Game ended: {len(game.events)} events for {game.player} -> {outcome}")
 
     watcher = GameWatcher(
         api=RiotLiveClient(),
@@ -105,13 +111,13 @@ def main(argv: list[str] | None = None) -> int:
     config = load_config(args.config)
 
     meta_token = os.environ.get("BIRDIE_META_TOKEN", "")
+    if not meta_token:
+        print("error: BIRDIE_META_TOKEN is not set", file=sys.stderr)
+        return 2
     if args.command == "skeleton":
-        if not meta_token:
-            print("error: BIRDIE_META_TOKEN is not set", file=sys.stderr)
-            return 2
         return _run_skeleton(config, args, meta_token)
     if args.command == "watch":
-        return _run_watch(config)
+        return _run_watch(config, meta_token)
     return 2
 
 

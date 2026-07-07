@@ -17,10 +17,12 @@ class FakeLiveClient:
         active_seq: list[str | None],
         event_polls: list[list[dict[str, Any]]] | None = None,
         game_time: float = 100.0,
+        champion: str = "Unknown",
     ) -> None:
         self._active = list(active_seq)
         self._polls = list(event_polls or [])
         self._game_time = game_time
+        self._champion = champion
         self._i_active = 0
         self._i_polls = 0
 
@@ -28,6 +30,9 @@ class FakeLiveClient:
         value = self._active[self._i_active]
         self._i_active += 1
         return value
+
+    def active_champion(self) -> str:
+        return self._champion
 
     def game_time(self) -> float:
         return self._game_time
@@ -84,10 +89,10 @@ class FakeCaptioner:
     def __init__(self, text: str = "CAPTION", log: list[str] | None = None) -> None:
         self.text = text
         self._log = log
-        self.calls: list[tuple[MatchData, Category]] = []
+        self.calls: list[tuple[MatchData, CompilationPlan]] = []
 
-    def caption(self, match: MatchData, dominant_category: Category) -> str:
-        self.calls.append((match, dominant_category))
+    def caption(self, match: MatchData, plan: CompilationPlan) -> str:
+        self.calls.append((match, plan))
         if self._log is not None:
             self._log.append("caption")
         return self.text

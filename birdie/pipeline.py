@@ -65,7 +65,7 @@ class SkeletonPipeline:
             posting_mode=PostingMode.REVIEW,
             dominant_category=Category.EPIC,
         )
-        caption = self._captioner.caption(match, plan.dominant_category)
+        caption = self._captioner.caption(match, plan)
 
         out = self._config.compilations_dir / f"{match.champion}-compilation.mp4"
         video = self._editor.render(recording, plan, self._config.output_profile, out)

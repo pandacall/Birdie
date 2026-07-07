@@ -12,7 +12,7 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
-from birdie.events import new_player_events
+from birdie.events import game_result, new_player_events
 from birdie.models import CompletedGame, Event, TimelineAnchor
 from birdie.ports import LiveClient, Recorder
 
@@ -35,6 +35,7 @@ class GameWatcher:
     def watch_once(self) -> CompletedGame:
         """Block until a game starts, record it to completion, hand it off."""
         player = self._await_game_start()
+        champion = self._api.active_champion()
         self._recorder.start()
         anchor = TimelineAnchor(
             recording_position=0.0, game_clock=self._api.game_time()
@@ -42,11 +43,16 @@ class GameWatcher:
 
         seen: set[int] = set()
         events: list[Event] = []
+        result = "Unknown"
         while self._api.active_player() is not None:
-            fresh = new_player_events(self._api.event_dicts(), player, seen)
+            batch = self._api.event_dicts()
+            fresh = new_player_events(batch, player, seen)
             for event in fresh:
                 seen.add(event.id)
             events.extend(fresh)
+            found = game_result(batch)
+            if found is not None:
+                result = found
             self._sleep(self._poll)
 
         recording = self._recorder.stop()
@@ -55,6 +61,8 @@ class GameWatcher:
             events=tuple(events),
             anchor=anchor,
             player=player,
+            champion=champion,
+            result=result,
         )
         self._on_game_end(game)
         return game

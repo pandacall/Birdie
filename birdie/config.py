@@ -7,11 +7,12 @@ walking skeleton only needs a handful; later slices add scores, rules, tone.
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from birdie.models import OutputProfile, Window
+from birdie.gate import Rule
+from birdie.models import Category, OutputProfile, PostingMode, Window
 
 _DEFAULT_PROFILE = OutputProfile(name="video", width=1920, height=1080, max_seconds=None)
 
@@ -47,6 +48,8 @@ class Config:
     scores: dict[str, float]
     window_pre: float = 8.0
     window_post: float = 4.0
+    rules: list[Rule] = field(default_factory=list)
+    default_mode: PostingMode = PostingMode.REVIEW
     obs_host: str = "localhost"
     obs_port: int = 4455
     meta_api_version: str = "v21.0"
@@ -78,6 +81,9 @@ def load_config(path: Path) -> Config:
     scores = dict(_DEFAULT_SCORES)
     scores.update({k: float(v) for k, v in raw.get("scores", {}).items()})
 
+    rules = [_parse_rule(r) for r in raw.get("rules", [])]
+    default_mode = PostingMode(str(raw.get("default_posting_mode", "review")))
+
     return Config(
         page_id=str(raw.get("page_id", "")),
         output_profile=profile,
@@ -89,7 +95,19 @@ def load_config(path: Path) -> Config:
         scores=scores,
         window_pre=float(tuning_raw.get("window_pre", 8.0)),
         window_post=float(tuning_raw.get("window_post", 4.0)),
+        rules=rules,
+        default_mode=default_mode,
         obs_host=str(obs_raw.get("host", "localhost")),
         obs_port=int(obs_raw.get("port", 4455)),
         meta_api_version=str(meta_raw.get("api_version", "v21.0")),
+    )
+
+
+def _parse_rule(raw: dict[str, Any]) -> Rule:
+    return Rule(
+        kind=str(raw["kind"]),
+        mode=PostingMode(str(raw["mode"])),
+        min_streak=int(raw["min_streak"]) if "min_streak" in raw else None,
+        category=Category(str(raw["category"])) if "category" in raw else None,
+        min_score=float(raw["min_score"]) if "min_score" in raw else None,
     )

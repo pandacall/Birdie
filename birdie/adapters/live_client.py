@@ -34,6 +34,18 @@ class RiotLiveClient:
             return None
         return str(resp.json())
 
+    def active_champion(self) -> str:
+        try:
+            resp = self._session.get(
+                f"{self._base}/activeplayer", timeout=self._timeout
+            )
+            resp.raise_for_status()
+        except requests.RequestException:
+            return "Unknown"
+        data: Any = resp.json()
+        champion = data.get("championStats", {}).get("championName")
+        return str(champion) if champion else "Unknown"
+
     def game_time(self) -> float:
         resp = self._session.get(f"{self._base}/gamestats", timeout=self._timeout)
         resp.raise_for_status()

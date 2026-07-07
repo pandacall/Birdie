@@ -46,6 +46,14 @@ def is_player_involved(event: Event, player: str) -> bool:
     return player in (event.actor, event.victim) or player in event.assisters
 
 
+def game_result(batch: Iterable[dict[str, Any]]) -> str | None:
+    """Read Victory/Defeat from a GameEnd event in the raw batch, or None."""
+    for raw in batch:
+        if raw.get("EventName") == "GameEnd":
+            return "Victory" if raw.get("Result") == "Win" else "Defeat"
+    return None
+
+
 def new_player_events(
     batch: Iterable[dict[str, Any]],
     player: str,

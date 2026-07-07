@@ -1,7 +1,8 @@
 from pathlib import Path
 
 from birdie.config import load_config
-from birdie.models import Window
+from birdie.gate import Rule
+from birdie.models import Category, PostingMode, Window
 
 
 def test_minimal_config_defaults_to_16x9_video_profile(tmp_path: Path) -> None:
@@ -50,3 +51,29 @@ def test_explicit_values_override_defaults(tmp_path: Path) -> None:
     assert cfg.compilations_dir == Path("D:/out")
     assert cfg.merge_gap == 4.0
     assert cfg.length_budget == 90.0
+
+
+def test_rules_and_default_mode_parse(tmp_path: Path) -> None:
+    cfg_file = tmp_path / "birdie.toml"
+    cfg_file.write_text(
+        'page_id = "1"\n'
+        'default_posting_mode = "review"\n'
+        "\n"
+        "[[rules]]\n"
+        'kind = "contains_multikill"\n'
+        "min_streak = 5\n"
+        'mode = "auto"\n'
+        "\n"
+        "[[rules]]\n"
+        'kind = "peak_category"\n'
+        'category = "blooper"\n'
+        'mode = "review"\n'
+    )
+
+    cfg = load_config(cfg_file)
+
+    assert cfg.default_mode == PostingMode.REVIEW
+    assert cfg.rules == [
+        Rule(kind="contains_multikill", mode=PostingMode.AUTO, min_streak=5),
+        Rule(kind="peak_category", mode=PostingMode.REVIEW, category=Category.BLOOPER),
+    ]
