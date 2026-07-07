@@ -69,3 +69,26 @@ def test_watcher_only_logs_events_involving_the_player(tmp_path: Path) -> None:
 
     assert game is not None
     assert [e.id for e in game.events] == [2]
+
+
+def test_watcher_salvages_partial_game_when_live_client_drops(tmp_path: Path) -> None:
+    player = "Me#EUW"
+    api = FakeLiveClient(
+        active_seq=[player, player],
+        event_polls=[[_kill(1, player, "X", 10.0)]],
+        error_on_call=3,  # await(1) + first loop(2) ok; third call drops
+    )
+    recorder = FakeRecorder(tmp_path / "g.mkv")
+    watcher = GameWatcher(
+        api=api,
+        recorder=recorder,
+        on_game_end=lambda _g: None,
+        sleep=lambda _s: None,
+    )
+
+    game = watcher.watch_once()
+
+    # the game was salvaged: recording stopped, the one collected event kept
+    assert recorder.stopped
+    assert game is not None
+    assert [e.id for e in game.events] == [1]

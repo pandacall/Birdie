@@ -24,9 +24,10 @@ from birdie.adapters.obs_recorder import ObsRecorder
 from birdie.captioner import TemplateCaptioner
 from birdie.config import Config, load_config
 from birdie.eventlog import write_event_log
+from birdie.ledger import ProcessedLedger
 from birdie.models import CompletedGame, MatchData
 from birdie.pipeline import SkeletonPipeline
-from birdie.postgame import process_game
+from birdie.postgame import recover_orphans, run_post_game
 from birdie.queue import ReviewQueue
 from birdie.review import ReviewService
 from birdie.watcher import GameWatcher
@@ -88,19 +89,25 @@ def _run_watch(config: Config, meta_token: str) -> int:
     captioner = TemplateCaptioner()
     publisher = MetaPublisher(config.page_id, meta_token, config.meta_api_version)
     queue = ReviewQueue(config.compilations_dir / "queue")
+    ledger = ProcessedLedger(config.compilations_dir / "processed.json")
 
     def on_game_end(game: CompletedGame) -> None:
         write_event_log(
             config.recordings_dir / f"{game.recording.stem}.events.json", game
         )
-        result = process_game(game, config, editor, captioner, publisher, queue)
+        result = run_post_game(game, config, editor, captioner, publisher, queue, ledger)
         if result.video is None:
-            outcome = "no clip-worthy moments"
+            outcome = "no compilation (empty or failed — check the review queue)"
         elif result.published_id is not None:
             outcome = f"auto-published {result.published_id}"
         else:
             outcome = f"queued for review ({result.queued_id})"
         print(f"Game ended: {len(game.events)} events for {game.player} -> {outcome}")
+
+    # Recover any games left unprocessed by a previous crash before watching.
+    recovered = recover_orphans(config, editor, captioner, publisher, queue, ledger)
+    if recovered:
+        print(f"Recovered {len(recovered)} orphaned game(s) from a previous run.")
 
     watcher = GameWatcher(
         api=RiotLiveClient(),

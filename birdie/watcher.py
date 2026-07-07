@@ -44,8 +44,15 @@ class GameWatcher:
         seen: set[int] = set()
         events: list[Event] = []
         result = "Unknown"
-        while self._api.active_player() is not None:
-            batch = self._api.event_dicts()
+        while True:
+            try:
+                if self._api.active_player() is None:
+                    break
+                batch = self._api.event_dicts()
+            except Exception:
+                # The live client dropped mid-game — salvage: end the game and
+                # process whatever was recorded/collected so far.
+                break
             fresh = new_player_events(batch, player, seen)
             for event in fresh:
                 seen.add(event.id)

@@ -18,15 +18,23 @@ class FakeLiveClient:
         event_polls: list[list[dict[str, Any]]] | None = None,
         game_time: float = 100.0,
         champion: str = "Unknown",
+        error_on_call: int | None = None,
+        error: Exception | None = None,
     ) -> None:
         self._active = list(active_seq)
         self._polls = list(event_polls or [])
         self._game_time = game_time
         self._champion = champion
+        self._error_on_call = error_on_call
+        self._error = error or RuntimeError("live client dropped")
+        self._calls = 0
         self._i_active = 0
         self._i_polls = 0
 
     def active_player(self) -> str | None:
+        self._calls += 1
+        if self._error_on_call is not None and self._calls == self._error_on_call:
+            raise self._error
         value = self._active[self._i_active]
         self._i_active += 1
         return value
@@ -99,13 +107,28 @@ class FakeCaptioner:
 
 
 class FakePublisher:
-    def __init__(self, post_id: str = "post-123", log: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        post_id: str = "post-123",
+        log: list[str] | None = None,
+        error: Exception | None = None,
+    ) -> None:
         self.post_id = post_id
         self._log = log
+        self._error = error
         self.calls: list[tuple[Path, str]] = []
 
     def publish(self, video: Path, caption: str) -> str:
         self.calls.append((video, caption))
         if self._log is not None:
             self._log.append("publish")
+        if self._error is not None:
+            raise self._error
         return self.post_id
+
+
+class FakeExplodingEditor:
+    """VideoEditor that always fails — for step-failure tests."""
+
+    def render(self, recording: Path, plan: object, profile: object, out: Path) -> Path:
+        raise RuntimeError("ffmpeg boom")
